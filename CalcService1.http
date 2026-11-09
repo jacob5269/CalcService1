@@ -1,5 +1,60 @@
 @CalcService1_HostAddress = http://localhost:5023
 
+### 1. XML, nested operations: 4 x 5 = 20
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: application/xml
+Accept: application/xml
+
+<Maths>
+  <Operation ID="Multiplication">
+    <Value>4</Value>
+    <Value>5</Value>
+  </Operation>
+</Maths>
+
+### 2. XML, recursion: 2 + 3 + (4 x 5) = 25
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: application/xml
+Accept: application/xml
+
+<Maths>
+  <Operation ID="Plus">
+    <Value>2</Value>
+    <Value>3</Value>
+    <Operation ID="Multiplication">
+      <Value>4</Value>
+      <Value>5</Value>
+    </Operation>
+  </Operation>
+</Maths>
+
+### 3. JSON, nested operations (same model, same endpoint)
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "operation": {
+    "id": "Plus",
+    "values": [ 2, 3 ],
+    "operations": [
+      { "id": "Multiplication", "values": [ 4, 5 ] }
+    ]
+  }
+}
+
+### 4. JSON, flat legacy shape with an operation alias
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: application/json
+Accept: application/json
+
+{
+  "operand1": 10,
+  "operand2": 4,
+  "operation": "divide"
+}
+
+### 5. XML, flat legacy shape (the original request contract)
 POST {{CalcService1_HostAddress}}/api/calculate
 Content-Type: application/xml
 Accept: application/xml
@@ -7,5 +62,51 @@ Accept: application/xml
 <CalculateRequest>
   <Operand1>10</Operand1>
   <Operand2>5</Operand2>
-  <Operation>Add</Operation>
+  <Operation>Subtract</Operation>
 </CalculateRequest>
+
+### 6. JSON response for an XML request (content negotiation)
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: application/xml
+Accept: application/json
+
+<Maths>
+  <Operation ID="Plus">
+    <Value>1</Value>
+    <Value>2</Value>
+  </Operation>
+</Maths>
+
+### 7. Error: division by zero -> 400
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: application/xml
+Accept: application/xml
+
+<Maths>
+  <Operation ID="Division">
+    <Value>1</Value>
+    <Value>0</Value>
+  </Operation>
+</Maths>
+
+### 8. Error: unknown operation -> 400
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: application/xml
+Accept: application/xml
+
+<Maths>
+  <Operation ID="Power">
+    <Value>2</Value>
+    <Value>8</Value>
+  </Operation>
+</Maths>
+
+### 9. Error: unsupported content type -> 415
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: text/plain
+Accept: application/xml
+
+1 + 1
+
+### 10. Health check
+GET {{CalcService1_HostAddress}}/health
