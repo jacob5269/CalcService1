@@ -1,0 +1,11 @@
+@CalcService1_HostAddress = http://localhost:5023
+
+POST {{CalcService1_HostAddress}}/api/calculate
+Content-Type: application/xml
+Accept: application/xml
+
+<CalculateRequest>
+  <Operand1>10</Operand1>
+  <Operand2>5</Operand2>
+  <Operation>Add</Operation>
+</CalculateRequest>
