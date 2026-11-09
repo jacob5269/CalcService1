@@ -2,9 +2,17 @@ using System.Xml;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// One class per mathematical operation. Adding a new operation only requires
+// a new IMathOperation implementation and a registration here.
+builder.Services.AddSingleton<IMathOperation, Addition>();
+builder.Services.AddSingleton<IMathOperation, Subtraction>();
+builder.Services.AddSingleton<IMathOperation, Multiplication>();
+builder.Services.AddSingleton<IMathOperation, Division>();
+builder.Services.AddSingleton<IOperationRegistry, OperationRegistry>();
+builder.Services.AddSingleton<ExpressionEvaluator>();
 
 var app = builder.Build();
 
@@ -16,30 +24,34 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/api/calculate", async (HttpRequest request) =>
+app.MapPost("/api/calculate", async (
+    HttpRequest request,
+    ExpressionEvaluator evaluator,
+    CancellationToken cancellationToken) =>
 {
-    CalculateRequest? input;
     try
     {
-        input = await XmlBody.DeserializeAsync<CalculateRequest>(
-            request.Body, request.HttpContext.RequestAborted);
+        var maths = await BodySerializer.ReadMathsAsync(request, cancellationToken);
+        var result = evaluator.Evaluate(maths.Operation);
+        return BodySerializer.Ok(request, new CalculateResponse { Result = result });
     }
-    catch (Exception ex) when (ex is XmlException or InvalidOperationException)
+    catch (MalformedRequestException ex)
     {
-        return XmlBody.Error(StatusCodes.Status400BadRequest,
-            "Request body is not valid CalculateRequest XML.");
+        return BodySerializer.Error(request, ex.StatusCode, ex.Message);
     }
-
-    if (input is null)
-        return XmlBody.Error(StatusCodes.Status400BadRequest, "Empty request body.");
-
-    if (!Calculator.TryCalculate(input.Operand1, input.Operand2,
-            input.Operation, out var result, out var error))
+    catch (CalculationException ex)
     {
-        return XmlBody.Error(StatusCodes.Status400BadRequest, error);
+        // Anything thrown by an operation or by the evaluator is a client error.
+        return BodySerializer.Error(request, StatusCodes.Status400BadRequest, ex.Message);
     }
+})
+.Produces<CalculateResponse>(StatusCodes.Status200OK, BodySerializer.XmlContentType, BodySerializer.JsonContentType)
+.Produces<ErrorResponse>(StatusCodes.Status400BadRequest, BodySerializer.XmlContentType, BodySerializer.JsonContentType)
+.Produces<ErrorResponse>(StatusCodes.Status415UnsupportedMediaType, BodySerializer.XmlContentType, BodySerializer.JsonContentType);
 
-    return XmlBody.Ok(new CalculateResponse { Result = result });
-});
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.Run();
+
+// Exposed so the test project can host the app with WebApplicationFactory<Program>.
+public partial class Program { }
