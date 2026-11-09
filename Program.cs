@@ -16,12 +16,13 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapPost("/api/calculate", (HttpRequest request) =>
+app.MapPost("/api/calculate", async (HttpRequest request) =>
 {
     CalculateRequest? input;
     try
     {
-        input = XmlBody.Deserialize<CalculateRequest>(request.Body);
+        input = await XmlBody.DeserializeAsync<CalculateRequest>(
+            request.Body, request.HttpContext.RequestAborted);
     }
     catch (Exception ex) when (ex is XmlException or InvalidOperationException)
     {

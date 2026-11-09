@@ -4,6 +4,17 @@ using System.Xml.Serialization;
 
 public static class XmlBody
 {
+    public static async Task<T?> DeserializeAsync<T>(
+        Stream body, CancellationToken cancellationToken = default)
+    {
+        // Kestrel disallows synchronous reads on the request body, so buffer it
+        // asynchronously first, then deserialize from the in-memory stream.
+        using var buffer = new MemoryStream();
+        await body.CopyToAsync(buffer, cancellationToken);
+        buffer.Position = 0;
+        return Deserialize<T>(buffer);
+    }
+
     public static T? Deserialize<T>(Stream body)
     {
         var settings = new XmlReaderSettings
